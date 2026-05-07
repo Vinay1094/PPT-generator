@@ -1,5 +1,5 @@
 import PptxGenJS from "pptxgenjs";
-import { Deck, Slide, ColorPalette } from "./types";
+import { Deck, ColorPalette } from "./types";
 
 const SLIDE_WIDTH = 13.333;
 const SLIDE_HEIGHT = 7.5;
@@ -7,22 +7,6 @@ const SLIDE_HEIGHT = 7.5;
 function cleanColor(hex: string): string {
   return hex.replace("#", "");
 }
-
-// Map layout type to a pptxgenjs-compatible layout name
-const LAYOUT_MAP: Record<string, string> = {
-  "title": "TITLE",
-  "bullets": "TITLE_AND_CONTENT",
-  "two-column": "TITLE_AND_CONTENT",
-  "image": "TITLE_AND_CONTENT",
-  "quote": "TITLE_AND_CONTENT",
-  "closing": "TITLE_AND_CONTENT",
-  "split": "TITLE_AND_CONTENT",
-  "grid": "TITLE_AND_CONTENT",
-  "body": "TITLE_AND_CONTENT",
-  "comparison": "TITLE_AND_CONTENT",
-  "image-focused": "TITLE_AND_CONTENT",
-  "data-viz": "TITLE_AND_CONTENT",
-};
 
 export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
   const pptx = new PptxGenJS();
@@ -46,7 +30,6 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
   for (const slide of deck.slides) {
     const pSlide = pptx.addSlide();
 
-    // Background
     pSlide.background = { color: bgColor };
 
     // Title
@@ -61,7 +44,7 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
       fontFace: "Arial",
     });
 
-    // Subtitle (if present)
+    // Subtitle
     if (slide.subtitle) {
       pSlide.addText(slide.subtitle, {
         x: 0.5,
@@ -77,60 +60,44 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
     // Content blocks
     let yPos = slide.subtitle ? 2.1 : 1.5;
     for (const block of slide.content ?? []) {
-      if (block.type === "bullets" && Array.isArray(block.items)) {
-        const bulletItems = block.items.map((item: string) => ({
-          text: item,
-          options: { bullet: true, fontSize: 16, color: textColor, fontFace: "Arial" },
-        }));
-        pSlide.addText(bulletItems, {
-          x: 0.5,
+      if (block.type === "bullets" && Array.isArray(block.items) && block.items.length > 0) {
+        // Render each bullet as a separate text box
+        for (const item of block.items) {
+          pSlide.addText("• " + item, {
+            x: 0.7,
+            y: yPos,
+            w: SLIDE_WIDTH - 1.4,
+            h: 0.45,
+            fontSize: 16,
+            color: textColor,
+            fontFace: "Arial",
+          });
+          yPos += 0.45;
+          if (yPos > SLIDE_HEIGHT - 0.5) break;
+        }
+        yPos += 0.1;
+      } else if (block.content) {
+        const isQuote = block.type === "quote";
+        const isHeading = block.type === "heading" || block.type === "subheading";
+        pSlide.addText(isQuote ? `"${block.content}"` : block.content, {
+          x: isQuote ? 1.0 : 0.5,
           y: yPos,
-          w: SLIDE_WIDTH - 1,
-          h: Math.min(block.items.length * 0.45 + 0.3, SLIDE_HEIGHT - yPos - 0.5),
+          w: isQuote ? SLIDE_WIDTH - 2 : SLIDE_WIDTH - 1,
+          h: isQuote ? 1.0 : 0.5,
+          fontSize: isHeading ? 20 : isQuote ? 20 : 16,
+          bold: isHeading,
+          italic: isQuote,
+          color: isQuote || isHeading ? primaryColor : textColor,
           fontFace: "Arial",
         });
-        yPos += block.items.length * 0.45 + 0.5;
-      } else if (block.type === "text" && block.content) {
-        pSlide.addText(block.content, {
-          x: 0.5,
-          y: yPos,
-          w: SLIDE_WIDTH - 1,
-          h: 0.6,
-          fontSize: 16,
-          color: textColor,
-          fontFace: "Arial",
-        });
-        yPos += 0.7;
-      } else if (block.type === "quote" && block.content) {
-        pSlide.addText(`"${block.content}"`, {
-          x: 1.0,
-          y: yPos,
-          w: SLIDE_WIDTH - 2,
-          h: 1.0,
-          fontSize: 20,
-          italic: true,
-          color: primaryColor,
-          fontFace: "Arial",
-        });
-        yPos += 1.2;
-      } else if (block.type === "heading" && block.content) {
-        pSlide.addText(block.content, {
-          x: 0.5,
-          y: yPos,
-          w: SLIDE_WIDTH - 1,
-          h: 0.5,
-          fontSize: 20,
-          bold: true,
-          color: primaryColor,
-          fontFace: "Arial",
-        });
-        yPos += 0.7;
+        yPos += isQuote ? 1.2 : 0.65;
       }
+      if (yPos > SLIDE_HEIGHT - 0.5) break;
     }
 
-    // Speaker notes
-    if (slide.speakerNotes) {
-      pSlide.addNotes(slide.speakerNotes);
+    // Speaker notes (field is 'notes' in the Slide type)
+    if (slide.notes) {
+      pSlide.addNotes(slide.notes);
     }
   }
 
