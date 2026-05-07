@@ -14,7 +14,7 @@ function contentToString(content: string | string[] | Record<string, unknown>): 
   return JSON.stringify(content);
 }
 
-export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
+export async function exportDeckToPptx(deck: Deck): Promise<Buffer> {
   const pptx = new PptxGenJS();
 
   pptx.layout = "LAYOUT_WIDE";
@@ -92,6 +92,6 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
     }
   }
 
-  const data = await pptx.write({ outputType: "uint8array" });
-  return data as Uint8Array;
+  const data = await pptx.write({ outputType: "nodebuffer" });
+  return data as Buffer;
 }
