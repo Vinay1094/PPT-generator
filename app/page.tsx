@@ -11,105 +11,79 @@ const LAYOUT_MAP: Record<string, string> = {
   split: "grid grid-cols-2 gap-8 h-full",
   grid: "grid grid-cols-2 gap-6 h-full",
   bullets: "flex flex-col gap-4 h-full",
-  image: "grid grid-cols-2 gap-8 h-full",
-  quote: "flex items-center justify-center h-full",
-  closing: "flex flex-col items-center justify-center text-center h-full gap-6",
+  body: "flex flex-col gap-4 h-full",
+  quote: "flex flex-col items-center justify-center h-full",
+  comparison: "grid grid-cols-2 gap-6 h-full",
   "image-focused": "grid grid-cols-3 gap-4 h-full",
+  "data-viz": "flex flex-col gap-4 h-full",
+  "two-column": "grid grid-cols-2 gap-6 h-full",
+  image: "flex flex-col gap-4 h-full",
+  closing: "flex flex-col items-center justify-center text-center h-full gap-6",
 };
 
-function SlidePreview({ slide, palette }: { slide: Slide; palette: Deck["colorPalette"] }) {
-  const layoutClass = LAYOUT_MAP[slide.layout] ?? "flex flex-col gap-4 h-full";
-
+function BlockRenderer({ block }: { block: ContentBlock }) {
+  if (block.type === "bullets") {
+    const items = Array.isArray(block.content)
+      ? (block.content as string[])
+      : typeof block.content === "string"
+      ? block.content.split("\n")
+      : [];
+    return (
+      <ul className="list-disc list-inside space-y-2">
+        {items.map((item, i) => (
+          <li key={i} className="text-base">{item}</li>
+        ))}
+      </ul>
+    );
+  }
+  if (block.type === "quote") {
+    return (
+      <blockquote className="italic text-xl border-l-4 border-blue-400 pl-4">
+        {typeof block.content === "string" ? block.content : JSON.stringify(block.content)}
+      </blockquote>
+    );
+  }
+  if (block.type === "heading") {
+    return <h2 className="text-2xl font-bold">{typeof block.content === "string" ? block.content : ""}</h2>;
+  }
+  if (block.type === "subheading") {
+    return <h3 className="text-xl font-semibold">{typeof block.content === "string" ? block.content : ""}</h3>;
+  }
   return (
-    <div
-      className="w-full aspect-video rounded-xl overflow-hidden shadow-lg p-8 flex flex-col"
-      style={{ backgroundColor: palette.background, color: palette.text }}
-    >
-      <div className="flex-1 overflow-hidden" style={{ color: palette.text }}>
-        <div className={layoutClass}>
-          {slide.content.map((block, i) => (
-            <BlockRenderer key={i} block={block} palette={palette} />
-          ))}
-        </div>
-      </div>
-      {slide.notes && (
-        <p className="mt-2 text-xs opacity-50 truncate">{slide.notes}</p>
-      )}
-    </div>
+    <p className="text-base">
+      {typeof block.content === "string" ? block.content : Array.isArray(block.content) ? (block.content as string[]).join(", ") : JSON.stringify(block.content)}
+    </p>
   );
 }
 
-function BlockRenderer({
-  block,
-  palette,
-}: {
-  block: ContentBlock;
-  palette: Deck["colorPalette"];
-}) {
-  switch (block.type) {
-    case "heading":
-      return (
-        <h1 className="text-4xl font-bold leading-tight" style={{ color: palette.text }}>
-          {block.content as string}
-        </h1>
-      );
-    case "subheading":
-      return (
-        <h2 className="text-2xl font-medium" style={{ color: palette.accent }}>
-          {block.content as string}
-        </h2>
-      );
-    case "bullets": {
-      const items = Array.isArray(block.content)
-        ? (block.content as string[])
-        : [block.content as string];
-      return (
-        <ul className="list-disc list-inside space-y-2 text-lg">
-          {items.map((item, i) => (
-            <li key={i} style={{ color: palette.text }}>
-              {item}
-            </li>
-          ))}
-        </ul>
-      );
-    }
-    case "text":
-      return (
-        <p className="text-lg leading-relaxed" style={{ color: palette.text }}>
-          {block.content as string}
-        </p>
-      );
-    case "quote":
-      return (
-        <blockquote
-          className="text-3xl italic font-light text-center px-8"
-          style={{ color: palette.accent }}
-        >
-          &ldquo;{block.content as string}&rdquo;
-        </blockquote>
-      );
-    case "image":
-      return (
-        <div
-          className="w-full h-full rounded-lg flex items-center justify-center text-sm opacity-60"
-          style={{ backgroundColor: palette.secondary, border: `1px solid ${palette.accent}` }}
-        >
-          [ Image Placeholder ]
-        </div>
-      );
-    default:
-      return null;
-  }
+function SlidePreview({ slide, palette }: { slide: Slide; palette: Deck["colorPalette"] }) {
+  const layoutClass = LAYOUT_MAP[slide.layout] ?? "flex flex-col gap-4 h-full";
+  return (
+    <div
+      className="w-full rounded-lg p-8 flex flex-col gap-4"
+      style={{ backgroundColor: palette.background, color: palette.text, minHeight: 360 }}
+    >
+      <h1 className="text-3xl font-bold" style={{ color: palette.primary }}>
+        {slide.title}
+      </h1>
+      <div className={layoutClass}>
+        {slide.content.map((block, i) => (
+          <BlockRenderer key={i} block={block} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function Home() {
   const [deck, setDeck] = useState<Deck>(SAMPLE_DECK);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [topic, setTopic] = useState("");
-  const [editPrompt, setEditPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [editLoading, setEditLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editInstruction, setEditInstruction] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const handleGenerate = useCallback(async () => {
     if (!topic.trim()) return;
@@ -119,54 +93,53 @@ export default function Home() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: topic.trim(), slideCount: 8 }),
+        body: JSON.stringify({ topic }),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Generation failed");
-      }
+      if (!res.ok) throw new Error(await res.text());
       const data: Deck = await res.json();
       setDeck(data);
       setCurrentSlide(0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err instanceof Error ? err.message : "Generation failed");
     } finally {
       setLoading(false);
     }
   }, [topic]);
 
   const handleEdit = useCallback(async () => {
-    if (!editPrompt.trim()) return;
-    setEditLoading(true);
+    if (!editInstruction.trim()) return;
+    setEditing(true);
     setError(null);
     try {
-      const payload: AgentEditRequest = {
+      const reqBody: AgentEditRequest = {
         deck,
         slideIndex: currentSlide,
-        instruction: editPrompt.trim(),
+        instruction: editInstruction,
       };
       const res = await fetch("/api/agent-edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(reqBody),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Edit failed");
-      }
+      if (!res.ok) throw new Error(await res.text());
       const data: AgentEditResponse = await res.json();
       setDeck(data.deck);
-      setEditPrompt("");
+      setEditInstruction("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err instanceof Error ? err.message : "Edit failed");
     } finally {
-      setEditLoading(false);
+      setEditing(false);
     }
-  }, [deck, currentSlide, editPrompt]);
+  }, [deck, currentSlide, editInstruction]);
 
   const handleExport = useCallback(async () => {
+    setExporting(true);
+    setError(null);
     try {
-      const blob = await exportDeckToPptx(deck);
+      const uint8 = await exportDeckToPptx(deck);
+      const blob = new Blob([uint8], {
+        type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -175,6 +148,8 @@ export default function Home() {
       URL.revokeObjectURL(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
     }
   }, [deck]);
 
@@ -183,111 +158,118 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl font-bold text-indigo-400">OpenSpark</span>
-          <span className="text-sm text-gray-500">AI Presentation Generator</span>
+      <header className="flex items-center justify-between px-8 py-4 bg-gray-900 border-b border-gray-800">
+        <h1 className="text-2xl font-bold text-blue-400">OpenSpark PPT Generator</h1>
+        <div className="flex gap-3">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium disabled:opacity-50 transition"
+          >
+            {exporting ? "Exporting..." : "Download PPTX"}
+          </button>
         </div>
-        <button
-          onClick={handleExport}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors"
-        >
-          Export .pptx
-        </button>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-72 border-r border-gray-800 flex flex-col gap-4 p-4 overflow-y-auto">
+        <aside className="w-72 bg-gray-900 border-r border-gray-800 flex flex-col gap-4 p-4 overflow-y-auto">
           {/* Generate */}
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-400">Topic</label>
+            <label className="text-sm font-medium text-gray-400">Generate Presentation</label>
             <input
               type="text"
+              placeholder="Enter topic..."
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-              placeholder="e.g. Climate Change"
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500"
             />
             <button
               onClick={handleGenerate}
               disabled={loading || !topic.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition-colors"
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium disabled:opacity-50 transition"
             >
-              {loading ? "Generating..." : "Generate Deck"}
+              {loading ? "Generating..." : "Generate"}
             </button>
+          </div>
+
+          {/* Slide list */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-400">Slides ({deck.slides.length})</label>
+            {deck.slides.map((s, i) => (
+              <button
+                key={s.id ?? i}
+                onClick={() => setCurrentSlide(i)}
+                className={`text-left px-3 py-2 rounded-lg text-sm transition ${
+                  i === currentSlide
+                    ? "bg-blue-700 text-white"
+                    : "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                }`}
+              >
+                <span className="text-gray-500 mr-2">{i + 1}.</span>
+                {s.title}
+              </button>
+            ))}
           </div>
 
           {/* AI Edit */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-400">AI Edit (Slide {currentSlide + 1})</label>
+          <div className="flex flex-col gap-2 mt-auto">
+            <label className="text-sm font-medium text-gray-400">AI Edit Slide {currentSlide + 1}</label>
             <textarea
-              value={editPrompt}
-              onChange={(e) => setEditPrompt(e.target.value)}
-              placeholder="e.g. Make this slide more concise"
               rows={3}
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              placeholder="Instruction, e.g. Make it more concise..."
+              value={editInstruction}
+              onChange={(e) => setEditInstruction(e.target.value)}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 resize-none"
             />
             <button
               onClick={handleEdit}
-              disabled={editLoading || !editPrompt.trim()}
-              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition-colors"
+              disabled={editing || !editInstruction.trim()}
+              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium disabled:opacity-50 transition"
             >
-              {editLoading ? "Editing..." : "Apply Edit"}
+              {editing ? "Editing..." : "Apply AI Edit"}
             </button>
-          </div>
-
-          {error && (
-            <div className="text-red-400 text-xs p-2 bg-red-950 rounded-lg border border-red-800">
-              {error}
-            </div>
-          )}
-
-          {/* Slide Thumbnails */}
-          <div className="flex flex-col gap-2 mt-2">
-            <p className="text-sm font-medium text-gray-400">Slides ({deck.slides.length})</p>
-            {deck.slides.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentSlide(i)}
-                className={`text-left px-3 py-2 rounded-lg text-xs truncate transition-colors ${
-                  i === currentSlide
-                    ? "bg-indigo-600 text-white"
-                    : "bg-gray-900 text-gray-400 hover:bg-gray-800"
-                }`}
-              >
-                {i + 1}. {s.title}
-              </button>
-            ))}
           </div>
         </aside>
 
         {/* Main canvas */}
-        <section className="flex-1 flex flex-col items-center justify-center p-8 overflow-auto">
-          <div className="w-full max-w-4xl">
-            <SlidePreview slide={slide} palette={deck.colorPalette} />
-            <div className="flex items-center justify-between mt-4">
-              <button
-                onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
-                disabled={currentSlide === 0}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded-lg text-sm transition-colors"
-              >
-                &larr; Previous
-              </button>
-              <span className="text-sm text-gray-500">
-                Slide {currentSlide + 1} of {deck.slides.length}
-              </span>
-              <button
-                onClick={() => setCurrentSlide(Math.min(deck.slides.length - 1, currentSlide + 1))}
-                disabled={currentSlide === deck.slides.length - 1}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded-lg text-sm transition-colors"
-              >
-                Next &rarr;
-              </button>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto">
+          {error && (
+            <div className="w-full max-w-3xl mb-4 px-4 py-3 bg-red-900 border border-red-700 rounded-lg text-red-200 text-sm">
+              {error}
             </div>
-          </div>
-        </section>
+          )}
+
+          {slide ? (
+            <div className="w-full max-w-4xl">
+              <SlidePreview slide={slide} palette={deck.colorPalette} />
+
+              {/* Slide navigation */}
+              <div className="flex items-center justify-center gap-4 mt-6">
+                <button
+                  onClick={() => setCurrentSlide((p) => Math.max(0, p - 1))}
+                  disabled={currentSlide === 0}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 transition"
+                >
+                  ← Prev
+                </button>
+                <span className="text-gray-400 text-sm">
+                  {currentSlide + 1} / {deck.slides.length}
+                </span>
+                <button
+                  onClick={() => setCurrentSlide((p) => Math.min(deck.slides.length - 1, p + 1))}
+                  disabled={currentSlide === deck.slides.length - 1}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 transition"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-gray-500 text-lg">No slides yet. Generate a presentation above.</div>
+          )}
+        </div>
       </div>
     </main>
   );
