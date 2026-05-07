@@ -5,16 +5,19 @@ export const LayoutTypeSchema = z.enum([
   "title",
   "split",
   "grid",
+  "bullets",
   "body",
   "quote",
   "comparison",
   "image-focused",
   "data-viz",
+  "image",
+  "closing",
+  "two-column",
 ]);
-
 export type LayoutType = z.infer<typeof LayoutTypeSchema>;
 
-// Color palette for each slide
+// Color palette for each slide deck
 export const ColorPaletteSchema = z.object({
   primary: z.string(),
   secondary: z.string(),
@@ -22,92 +25,60 @@ export const ColorPaletteSchema = z.object({
   background: z.string(),
   text: z.string(),
 });
-
 export type ColorPalette = z.infer<typeof ColorPaletteSchema>;
 
-// Individual content block within a slide
+// A single content block within a slide
 export const ContentBlockSchema = z.object({
-  type: z.enum(["heading", "body", "callout", "bullet", "image", "chart", "icon"]),
-  content: z.string(),
+  type: z.enum(["heading", "subheading", "text", "bullets", "image", "quote", "chart", "table"]),
+  content: z.union([z.string(), z.array(z.string()), z.record(z.unknown())]),
   style: z.record(z.string()).optional(),
-  sourceUrl: z.string().url().optional(),
-  confidence: z.number().min(0).max(1).optional(),
 });
-
 export type ContentBlock = z.infer<typeof ContentBlockSchema>;
 
-// Research source with fact-check metadata
-export const ResearchSourceSchema = z.object({
-  url: z.string().url(),
-  title: z.string(),
-  snippet: z.string(),
-  credibilityScore: z.number().min(0).max(1),
-  extractedAt: z.string(),
-});
-
-export type ResearchSource = z.infer<typeof ResearchSourceSchema>;
-
-// Individual slide definition
+// A single slide
 export const SlideSchema = z.object({
-  slideNumber: z.number().positive(),
+  id: z.string().optional(),
   title: z.string(),
-  subtitle: z.string().optional(),
-  layoutType: LayoutTypeSchema,
-  colorPalette: ColorPaletteSchema,
-  visualMetaphor: z.string(),
-  blocks: z.array(ContentBlockSchema),
-  sources: z.array(ResearchSourceSchema).optional(),
+  layout: LayoutTypeSchema,
+  content: z.array(ContentBlockSchema),
   notes: z.string().optional(),
-  imageUrl: z.string().url().optional(),
+  backgroundColor: z.string().optional(),
 });
-
 export type Slide = z.infer<typeof SlideSchema>;
 
-// Full presentation deck
+// The full presentation deck
 export const DeckSchema = z.object({
   title: z.string(),
   subtitle: z.string().optional(),
   author: z.string().optional(),
   topic: z.string(),
   slides: z.array(SlideSchema),
+  colorPalette: ColorPaletteSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
   version: z.number().default(1),
 });
-
 export type Deck = z.infer<typeof DeckSchema>;
 
-// Agent edit request
-export const AgentEditRequestSchema = z.object({
-  deckId: z.string().optional(),
-  slideNumber: z.number().positive(),
-  instruction: z.string(),
-});
-
-export type AgentEditRequest = z.infer<typeof AgentEditRequestSchema>;
-
-// Agent edit response
-export const AgentEditResponseSchema = z.object({
-  slideNumber: z.number(),
-  updatedBlocks: z.array(ContentBlockSchema),
-  updatedColorPalette: ColorPaletteSchema.optional(),
-  updatedLayoutType: LayoutTypeSchema.optional(),
-  reason: z.string(),
-});
-
-export type AgentEditResponse = z.infer<typeof AgentEditResponseSchema>;
-
-// Deck generation request
+// Request schema for generating a new deck
 export const GenerateDeckRequestSchema = z.object({
   topic: z.string().min(1),
-  targetAudience: z.string().optional(),
-  slideCount: z.number().min(5).max(20).default(10),
-  tone: z.enum(["professional", "casual", "academic", "technical"]).default("professional"),
+  slideCount: z.number().min(3).max(20).default(8),
+  audience: z.string().optional(),
+  style: z.string().optional(),
 });
-
 export type GenerateDeckRequest = z.infer<typeof GenerateDeckRequestSchema>;
 
-// Agent role definitions
-export const AgentRoleSchema = z.enum(["researcher", "strategist", "designer"]);
+// Request/response for the AI edit endpoint
+export const AgentEditRequestSchema = z.object({
+  deck: DeckSchema,
+  slideIndex: z.number().min(0),
+  instruction: z.string().min(1),
+});
+export type AgentEditRequest = z.infer<typeof AgentEditRequestSchema>;
 
-export type AgentRole = z.infer<typeof AgentRoleSchema>;
+export const AgentEditResponseSchema = z.object({
+  deck: DeckSchema,
+  message: z.string(),
+});
+export type AgentEditResponse = z.infer<typeof AgentEditResponseSchema>;
