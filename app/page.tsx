@@ -3,298 +3,288 @@
 import { useState, useCallback } from "react";
 import { SAMPLE_DECK } from "@/lib/sample-data";
 import type { Deck, Slide, ContentBlock, AgentEditRequest, AgentEditResponse } from "@/lib/types";
-import PptxGenJS from "pptxgenjs";
-import { exportToPptx } from "@/lib/pptx";
+import { exportDeckToPptx } from "@/lib/pptx";
 
 // Layout class map for Tailwind
 const LAYOUT_MAP: Record<string, string> = {
   title: "flex flex-col items-center justify-center text-center h-full gap-8",
   split: "grid grid-cols-2 gap-8 h-full",
   grid: "grid grid-cols-2 gap-6 h-full",
-  body: "flex flex-col gap-6 h-full",
-  quote: "flex flex-col items-center justify-center text-center h-full",
-  comparison: "grid grid-cols-2 gap-8 h-full",
+  bullets: "flex flex-col gap-4 h-full",
+  image: "grid grid-cols-2 gap-8 h-full",
+  quote: "flex items-center justify-center h-full",
+  closing: "flex flex-col items-center justify-center text-center h-full gap-6",
   "image-focused": "grid grid-cols-3 gap-4 h-full",
-  "data-viz": "flex flex-col gap-4 h-full",
 };
+
+function SlidePreview({ slide, palette }: { slide: Slide; palette: Deck["colorPalette"] }) {
+  const layoutClass = LAYOUT_MAP[slide.layout] ?? "flex flex-col gap-4 h-full";
+
+  return (
+    <div
+      className="w-full aspect-video rounded-xl overflow-hidden shadow-lg p-8 flex flex-col"
+      style={{ backgroundColor: palette.background, color: palette.text }}
+    >
+      <div className="flex-1 overflow-hidden" style={{ color: palette.text }}>
+        <div className={layoutClass}>
+          {slide.content.map((block, i) => (
+            <BlockRenderer key={i} block={block} palette={palette} />
+          ))}
+        </div>
+      </div>
+      {slide.notes && (
+        <p className="mt-2 text-xs opacity-50 truncate">{slide.notes}</p>
+      )}
+    </div>
+  );
+}
+
+function BlockRenderer({
+  block,
+  palette,
+}: {
+  block: ContentBlock;
+  palette: Deck["colorPalette"];
+}) {
+  switch (block.type) {
+    case "heading":
+      return (
+        <h1 className="text-4xl font-bold leading-tight" style={{ color: palette.text }}>
+          {block.content as string}
+        </h1>
+      );
+    case "subheading":
+      return (
+        <h2 className="text-2xl font-medium" style={{ color: palette.accent }}>
+          {block.content as string}
+        </h2>
+      );
+    case "bullets": {
+      const items = Array.isArray(block.content)
+        ? (block.content as string[])
+        : [block.content as string];
+      return (
+        <ul className="list-disc list-inside space-y-2 text-lg">
+          {items.map((item, i) => (
+            <li key={i} style={{ color: palette.text }}>
+              {item}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case "text":
+      return (
+        <p className="text-lg leading-relaxed" style={{ color: palette.text }}>
+          {block.content as string}
+        </p>
+      );
+    case "quote":
+      return (
+        <blockquote
+          className="text-3xl italic font-light text-center px-8"
+          style={{ color: palette.accent }}
+        >
+          &ldquo;{block.content as string}&rdquo;
+        </blockquote>
+      );
+    case "image":
+      return (
+        <div
+          className="w-full h-full rounded-lg flex items-center justify-center text-sm opacity-60"
+          style={{ backgroundColor: palette.secondary, border: `1px solid ${palette.accent}` }}
+        >
+          [ Image Placeholder ]
+        </div>
+      );
+    default:
+      return null;
+  }
+}
 
 export default function Home() {
   const [deck, setDeck] = useState<Deck>(SAMPLE_DECK);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [topic, setTopic] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [agentStatus, setAgentStatus] = useState<string>("");
-  const [editInstruction, setEditInstruction] = useState("");
-  const [showSources, setShowSources] = useState(false);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Generate deck via API
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     if (!topic.trim()) return;
-    setIsGenerating(true);
-    setAgentStatus("researcher:searching-web");
-
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic,
-          slideCount: 10,
-          tone: "professional",
-        }),
+        body: JSON.stringify({ topic: topic.trim(), slideCount: 8 }),
       });
-      if (!res.ok) throw new Error("Generation failed");
-      const result = await res.json();
-      setDeck(result.deck);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Generation failed");
+      }
+      const data: Deck = await res.json();
+      setDeck(data);
       setCurrentSlide(0);
     } catch (err) {
-      console.error("Generate error:", err);
-      setAgentStatus("error:generation-failed");
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setIsGenerating(false);
-      setAgentStatus("");
+      setLoading(false);
     }
-  };
+  }, [topic]);
 
-  // Agent edit slide
-  const handleEdit = async () => {
-    if (!editInstruction.trim()) return;
-    setAgentStatus("designer:re-rendering");
-
+  const handleEdit = useCallback(async () => {
+    if (!editPrompt.trim()) return;
+    setEditLoading(true);
+    setError(null);
     try {
-      const slide = deck.slides[currentSlide];
+      const payload: AgentEditRequest = {
+        deck,
+        slideIndex: currentSlide,
+        instruction: editPrompt.trim(),
+      };
       const res = await fetch("/api/agent-edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slideNumber: slide.slideNumber,
-          instruction: editInstruction,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Edit failed");
-      const result: AgentEditResponse = await res.json();
-
-      // Update slide with agent response
-      const updatedSlides = deck.slides.map((s) =>
-        s.slideNumber === result.slideNumber
-          ? { ...s, blocks: result.updatedBlocks }
-          : s
-      );
-      setDeck({ ...deck, slides: updatedSlides });
-      setEditInstruction("");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Edit failed");
+      }
+      const data: AgentEditResponse = await res.json();
+      setDeck(data.deck);
+      setEditPrompt("");
     } catch (err) {
-      console.error("Edit error:", err);
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setAgentStatus("");
+      setEditLoading(false);
     }
-  };
+  }, [deck, currentSlide, editPrompt]);
 
-  // Export to PPTX
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     try {
-      const pres = exportToPptx(deck);
-      pres.writeFile({ fileName: `${deck.title.replace(/\s+/g, "_")}.pptx` });
+      const blob = await exportDeckToPptx(deck);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${deck.title.replace(/\s+/g, "-")}.pptx`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Export error:", err);
+      setError(err instanceof Error ? err.message : "Export failed");
     }
   }, [deck]);
 
   const slide = deck.slides[currentSlide];
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white text-sm font-bold">OS</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">OpenSpark</h1>
-            <p className="text-xs text-gray-500">AI Presentation Generator</p>
-          </div>
+          <span className="text-2xl font-bold text-indigo-400">OpenSpark</span>
+          <span className="text-sm text-gray-500">AI Presentation Generator</span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400 italic">
-            {agentStatus && (
-              <span className="agent-thinking">[{agentStatus}]</span>
-            )}
-          </span>
-          <button
-            onClick={handleExport}
-            className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition"
-          >
-            Export PPTX
-          </button>
-        </div>
+        <button
+          onClick={handleExport}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors"
+        >
+          Export .pptx
+        </button>
       </header>
 
-      <div className="flex h-[calc(100vh-65px)]">
-        {/* Left Sidebar - Slide Thumbnails */}
-        <aside className="w-48 bg-white border-r border-gray-200 overflow-y-auto slide-preview flex-shrink-0">
-          <div className="p-2 space-y-2">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-72 border-r border-gray-800 flex flex-col gap-4 p-4 overflow-y-auto">
+          {/* Generate */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-gray-400">Topic</label>
+            <input
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
+              placeholder="e.g. Climate Change"
+              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              onClick={handleGenerate}
+              disabled={loading || !topic.trim()}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition-colors"
+            >
+              {loading ? "Generating..." : "Generate Deck"}
+            </button>
+          </div>
+
+          {/* AI Edit */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-gray-400">AI Edit (Slide {currentSlide + 1})</label>
+            <textarea
+              value={editPrompt}
+              onChange={(e) => setEditPrompt(e.target.value)}
+              placeholder="e.g. Make this slide more concise"
+              rows={3}
+              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            />
+            <button
+              onClick={handleEdit}
+              disabled={editLoading || !editPrompt.trim()}
+              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition-colors"
+            >
+              {editLoading ? "Editing..." : "Apply Edit"}
+            </button>
+          </div>
+
+          {error && (
+            <div className="text-red-400 text-xs p-2 bg-red-950 rounded-lg border border-red-800">
+              {error}
+            </div>
+          )}
+
+          {/* Slide Thumbnails */}
+          <div className="flex flex-col gap-2 mt-2">
+            <p className="text-sm font-medium text-gray-400">Slides ({deck.slides.length})</p>
             {deck.slides.map((s, i) => (
               <button
-                key={s.slideNumber}
+                key={i}
                 onClick={() => setCurrentSlide(i)}
-                className={`w-full text-left p-2 rounded-lg border transition ${
+                className={`text-left px-3 py-2 rounded-lg text-xs truncate transition-colors ${
                   i === currentSlide
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-900 text-gray-400 hover:bg-gray-800"
                 }`}
               >
-                <div
-                  className="w-full aspect-video bg-gray-100 rounded mb-1 text-xs flex items-center justify-center"
-                  style={{ backgroundColor: s.colorPalette.background }}
-                >
-                  <span style={{ color: s.colorPalette.text }}>{s.title.slice(0, 20)}{s.title.length > 20 ? "..." : ""}</span>
-                </div>
-                <span className="text-xs text-gray-600">{s.slideNumber}. {s.title.slice(0, 18)}</span>
+                {i + 1}. {s.title}
               </button>
             ))}
           </div>
         </aside>
 
-        {/* Main Canvas Area */}
-        <section className="flex-1 flex flex-col">
-          {/* Topic Input Bar */}
-          <div className="bg-white border-b border-gray-200 p-3 flex gap-3 items-center">
-            <input
-              type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="Enter a topic... e.g., 'Agentic AI'"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isGenerating}
-            />
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || !topic.trim()}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {isGenerating ? "Generating..." : "Generate"}
-            </button>
-          </div>
-
-          {/* Slide Canvas - 1280x720 container */}
-          <div className="flex-1 bg-gray-100 overflow-auto p-8 flex items-center justify-center">
-            <div
-              id="slide-canvas"
-              className="slide-canvas shadow-xl"
-              style={{
-                backgroundColor: slide.colorPalette.background,
-                color: slide.colorPalette.text,
-              }}
-            >
-              <div className={LAYOUT_MAP[slide.layoutType] || LAYOUT_MAP.body}>
-                {slide.layoutType === "title" ? (
-                  <>
-                    <h2 className="text-5xl font-bold" style={{ color: slide.colorPalette.text }}>
-                      {slide.title}
-                    </h2>
-                    <p className="text-xl" style={{ color: slide.colorPalette.text, opacity: 0.8 }}>
-                      {slide.subtitle}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    {slide.blocks.map((block, idx) => (
-                      <div key={idx}>
-                        {block.type === "heading" && (
-                          <h3 className="text-3xl font-bold" style={{ color: slide.colorPalette.text }}>
-                            {block.content}
-                          </h3>
-                        )}
-                        {block.type === "body" && (
-                          <p className="text-lg" style={{ color: slide.colorPalette.text, opacity: 0.9 }}>
-                            {block.content}
-                          </p>
-                        )}
-                        {block.type === "bullet" && (
-                          <div className="flex items-start gap-2" style={{ color: slide.colorPalette.text }}>
-                            <span className="text-blue-500">&#9679;</span>
-                            <span>{block.content}</span>
-                          </div>
-                        )}
-                        {block.type === "callout" && (
-                          <div
-                            className="p-3 rounded-lg text-base font-medium"
-                            style={{
-                              backgroundColor: slide.colorPalette.accent,
-                              color: slide.colorPalette.background,
-                            }}
-                          >
-                            {block.content}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-
-              {/* Fact Check Badge */}
-              {showSources && slide.sources && slide.sources.length > 0 && (
-                <div className="fact-check-overlay credible">
-                  <p className="font-bold mb-1">Verified Sources</p>
-                  <ul className="space-y-1">
-                    {slide.sources.slice(0, 3).map((src, i) => (
-                      <li key={i} className="text-xs truncate">
-                        {src.title} ({Math.round(src.credibilityScore * 100)}% trustworthy)
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Navigation & Edit Bar */}
-          <div className="bg-white border-t border-gray-200 p-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+        {/* Main canvas */}
+        <section className="flex-1 flex flex-col items-center justify-center p-8 overflow-auto">
+          <div className="w-full max-w-4xl">
+            <SlidePreview slide={slide} palette={deck.colorPalette} />
+            <div className="flex items-center justify-between mt-4">
               <button
-                onClick={() => setCurrentSlide((s) => Math.max(0, s - 1))}
+                onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
                 disabled={currentSlide === 0}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded-lg text-sm transition-colors"
               >
-                &#8592; Prev
+                &larr; Previous
               </button>
-              <span className="text-sm text-gray-600">
-                {slide.slideNumber} / {deck.slides.length}
+              <span className="text-sm text-gray-500">
+                Slide {currentSlide + 1} of {deck.slides.length}
               </span>
               <button
-                onClick={() =>
-                  setCurrentSlide((s) => Math.min(deck.slides.length - 1, s + 1))
-                }
+                onClick={() => setCurrentSlide(Math.min(deck.slides.length - 1, currentSlide + 1))}
                 disabled={currentSlide === deck.slides.length - 1}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded-lg text-sm transition-colors"
               >
-                Next &#8594;
+                Next &rarr;
               </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowSources(!showSources)}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900"
-              >
-                {showSources ? "Hide Sources" : "Show Sources"}
-              </button>
-              <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
-                <input
-                  type="text"
-                  value={editInstruction}
-                  onChange={(e) => setEditInstruction(e.target.value)}
-                  placeholder="Ask AI: 'make this more professional'..."
-                  className="w-64 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleEdit}
-                  disabled={!editInstruction.trim()}
-                  className="px-3 py-1.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
-                >
-                  AI Edit
-                </button>
-              </div>
             </div>
           </div>
         </section>
