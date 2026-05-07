@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exportToPptx } from "@/lib/pptx";
+import { exportDeckToPptx } from "@/lib/pptx";
 import { DeckSchema } from "@/lib/types";
 
 // POST /api/export
@@ -11,31 +11,23 @@ export async function POST(req: NextRequest) {
     // Validate the deck
     const deck = DeckSchema.parse(body.deck);
 
-    // Generate PPTX using pptxgenjs
-    const pres = exportToPptx(deck);
+    // Generate PPTX blob
+    const blob = await exportDeckToPptx(deck);
+    const arrayBuffer = await blob.arrayBuffer();
 
-    // Get the binary data
-    const buffer = await pres.writeFile({ outputType: "nodebuffer" });
-
-    // Return as a downloadable blob
-    return new NextResponse(buffer, {
+    return new NextResponse(arrayBuffer, {
+      status: 200,
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "Content-Disposition": `attachment; filename="${deck.title.replace(/\s+/g, "_")}.pptx"`,
+        "Content-Disposition": `attachment; filename="${deck.title.replace(/\s+/g, "-")}.pptx"`,
       },
     });
-  } catch (error: any) {
-    const isZodError = error?.name === "ZodError";
+  } catch (error) {
+    console.error("Export error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: isZodError
-          ? "Invalid deck format. Cannot export."
-          : error?.message || "Export failed",
-        details: isZodError ? error?.issues : undefined,
-      },
-      { status: isZodError ? 400 : 500 }
+      { error: error instanceof Error ? error.message : "Export failed" },
+      { status: 500 }
     );
   }
 }
