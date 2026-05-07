@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { SAMPLE_DECK } from "@/lib/sample-data";
 import type { Deck, Slide, ContentBlock, AgentEditRequest, AgentEditResponse } from "@/lib/types";
-import { exportDeckToPptx } from "@/lib/pptx";
+import { exportDeckToPptx, base64ToBlob } from "@/lib/pptx";
 
 // Layout class map for Tailwind
 const LAYOUT_MAP: Record<string, string> = {
@@ -51,7 +51,11 @@ function BlockRenderer({ block }: { block: ContentBlock }) {
   }
   return (
     <p className="text-base">
-      {typeof block.content === "string" ? block.content : Array.isArray(block.content) ? (block.content as string[]).join(", ") : JSON.stringify(block.content)}
+      {typeof block.content === "string"
+        ? block.content
+        : Array.isArray(block.content)
+        ? (block.content as string[]).join(", ")
+        : JSON.stringify(block.content)}
     </p>
   );
 }
@@ -136,10 +140,9 @@ export default function Home() {
     setExporting(true);
     setError(null);
     try {
-      const uint8 = await exportDeckToPptx(deck);
-      const blob = new Blob([uint8], {
-        type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      });
+      // exportDeckToPptx returns base64 string; convert to Blob for download
+      const base64 = await exportDeckToPptx(deck);
+      const blob = base64ToBlob(base64);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
