@@ -1,202 +1,148 @@
 import { Deck } from "./types";
 
-export const SAMPLE_DAIK_TOPIC = "Agentic AI";
+export const SAMPLE_DECK_TOPIC = "Agentic AI";
 
 export const SAMPLE_DECK: Deck = {
   title: "Agentic AI",
   subtitle: "From Prompts to Autonomous Agents",
   author: "OpenSpark AI",
-  topic: SAMPLE_DAIK_TOPIC,
-  slides: [
-    {
-      slideNumber: 1,
-      title: "Agentic AI",
-      subtitle: "The Next Frontier in Artificial Intelligence",
-      layoutType: "title",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#0f172a",
-        text: "#f8fafc",
-      },
-      visualMetaphor: "Dark gradient with floating neural network nodes",
-      blocks: [
-        { type: "heading", content: "Agentic AI" },
-        { type: "body", content: "From Prompts to Autonomous Agents" },
-      ],
-    },
-    {
-      slideNumber: 2,
-      title: "What is Agentic AI?",
-      layoutType: "split",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#ffffff",
-        text: "#1e293b",
-      },
-      visualMetaphor: "Side-by-side comparison of traditional vs agentic AI",
-      blocks: [
-        { type: "heading", content: "What is Agentic AI?" },
-        { type: "body", content: "AI systems that plan, reason, and act autonomously." },
-        { type: "callout", content: "Unlike chatbots, agents can use tools and take actions." },
-      ],
-    },
-    {
-      slideNumber: 3,
-      title: "Key Capabilities",
-      layoutType: "grid",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#f8fafc",
-        text: "#1e293b",
-      },
-      visualMetaphor: "Grid of capability cards with icons",
-      blocks: [
-        { type: "heading", content: "Core Capabilities" },
-        { type: "bullet", content: "Reasoning & Planning" },
-        { type: "bullet", content: "Tool Use" },
-        { type: "bullet", content: "Memory & Context" },
-        { type: "bullet", content: "Multi-step Tasks" },
-      ],
-    },
-    {
-      slideNumber: 4,
-      title: "Agent Architecture",
-      layoutType: "body",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#ffffff",
-        text: "#1e293b",
-      },
-      visualMetaphor: "Flowchart showing perception, reasoning, action loop",
-      blocks: [
-        { type: "heading", content: "Agent Architecture" },
-        { type: "body", content: "Observe" },
-        { type: "body", content: "Think" },
-        { type: "body", content: "Act" },
-      ],
-    },
-    {
-      slideNumber: 5,
-      title: "Use Cases",
-      layoutType: "comparison",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#f1f5f9",
-        text: "#1e293b",
-      },
-      visualMetaphor: "Split comparison of business vs personal use cases",
-      blocks: [
-        { type: "heading", content: "Enterprise" },
-        { type: "bullet", content: "Customer Support" },
-        { type: "bullet", content: "Data Analysis" },
-        { type: "heading", content: "Personal" },
-        { type: "bullet", content: "Task Automation" },
-        { type: "bullet", content: "Learning Assistant" },
-      ],
-    },
-    {
-      slideNumber: 6,
-      title: "Market Impact",
-      layoutType: "data-viz",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#ffffff",
-        text: "#1e293b",
-      },
-      visualMetaphor: "Bar chart showing AI market growth",
-      blocks: [
-        { type: "heading", content: "$500B+ by 2030" },
-        { type: "body", content: "Agentic AI market projected growth" },
-        { type: "callout", content: "60% of enterprises adopting by 2027" },
-      ],
-    },
-    {
-      slideNumber: 7,
-      title: "Ethical Considerations",
-      layoutType: "quote",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#0f172a",
-        text: "#f8fafc",
-      },
-      visualMetaphor: "Dark themed quote slide with balance scale icon",
-      blocks: [
-        { type: "heading", content: "With great power comes great responsibility." },
-        { type: "body", content: "Key concerns: Bias, Transparency, Control, Privacy" },
-      ],
-    },
-    {
-      slideNumber: 8,
-      title: "The Future",
-      layoutType: "image-focused",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#ffffff",
-        text: "#1e293b",
-      },
-      visualMetaphor: "Futuristic timeline showing AI evolution",
-      blocks: [
-        { type: "heading", content: "2026: Multi-agent systems" },
-        { type: "heading", content: "2028: Self-improving agents" },
-        { type: "heading", content: "2030: Artificial General Intelligence" },
-      ],
-    },
-    {
-      slideNumber: 9,
-      title: "Getting Started",
-      layoutType: "split",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#f8fafc",
-        text: "#1e293b",
-      },
-      visualMetaphor: "Split layout with tools on left, steps on right",
-      blocks: [
-        { type: "heading", content: "Tools" },
-        { type: "bullet", content: "LangChain" },
-        { type: "bullet", content: "CrewAI" },
-        { type: "heading", content: "Steps" },
-        { type: "bullet", content: "Define Goal" },
-        { type: "bullet", content: "Choose Tools" },
-      ],
-    },
-    {
-      slideNumber: 10,
-      title: "Thank You",
-      layoutType: "title",
-      colorPalette: {
-        primary: "#3b82f6",
-        secondary: "#1e40af",
-        accent: "#d946ef",
-        background: "#0f172a",
-        text: "#f8fafc",
-      },
-      visualMetaphor: "Dark gradient with thank you message and QR code placeholder",
-      blocks: [
-        { type: "heading", content: "Thank You!" },
-        { type: "body", content: "Questions?" },
-      ],
-    },
-  ],
+  topic: SAMPLE_DECK_TOPIC,
+  colorPalette: {
+    primary: "#6366f1",
+    secondary: "#4f46e5",
+    accent: "#a5b4fc",
+    background: "#0f172a",
+    text: "#f1f5f9",
+  },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   version: 1,
+  slides: [
+    {
+      id: "slide-1",
+      title: "Agentic AI",
+      layout: "title",
+      content: [
+        { type: "heading", content: "Agentic AI" },
+        { type: "subheading", content: "From Prompts to Autonomous Agents" },
+      ],
+      notes: "Welcome to Agentic AI - the next frontier in artificial intelligence.",
+    },
+    {
+      id: "slide-2",
+      title: "What is Agentic AI?",
+      layout: "bullets",
+      content: [
+        { type: "heading", content: "What is Agentic AI?" },
+        {
+          type: "bullets",
+          content: [
+            "AI systems that autonomously plan and execute multi-step tasks",
+            "Agents perceive environment, reason, and take actions",
+            "Can use tools: web search, code execution, APIs",
+            "Loop: Observe → Think → Act → Observe",
+          ],
+        },
+      ],
+      notes: "Agentic AI goes beyond simple Q&A - it can act in the world.",
+    },
+    {
+      id: "slide-3",
+      title: "Core Components",
+      layout: "split",
+      content: [
+        { type: "heading", content: "Core Components" },
+        {
+          type: "bullets",
+          content: ["Planning module", "Memory (short & long term)", "Tool use"],
+        },
+        {
+          type: "bullets",
+          content: ["Reasoning engine", "Feedback loops", "Safety guardrails"],
+        },
+      ],
+      notes: "Every agent system needs these six building blocks.",
+    },
+    {
+      id: "slide-4",
+      title: "Key Insight",
+      layout: "quote",
+      content: [
+        { type: "heading", content: "Key Insight" },
+        {
+          type: "quote",
+          content:
+            "The shift from chatbots to agents is the shift from answering questions to solving problems.",
+        },
+      ],
+      notes: "This captures the fundamental transformation happening in AI.",
+    },
+    {
+      id: "slide-5",
+      title: "Real-World Applications",
+      layout: "bullets",
+      content: [
+        { type: "heading", content: "Real-World Applications" },
+        {
+          type: "bullets",
+          content: [
+            "Software development automation (Devin, GitHub Copilot Workspace)",
+            "Research assistants (Perplexity, Deep Research)",
+            "Business process automation",
+            "Customer support escalation",
+            "Data analysis pipelines",
+          ],
+        },
+      ],
+      notes: "These are live products people are using today.",
+    },
+    {
+      id: "slide-6",
+      title: "Challenges",
+      layout: "bullets",
+      content: [
+        { type: "heading", content: "Challenges & Risks" },
+        {
+          type: "bullets",
+          content: [
+            "Hallucination and compounding errors",
+            "Security: prompt injection attacks",
+            "Cost: many LLM calls per task",
+            "Evaluation: hard to measure agent performance",
+            "Trust & alignment concerns",
+          ],
+        },
+      ],
+      notes: "We must be honest about the challenges before deploying agents.",
+    },
+    {
+      id: "slide-7",
+      title: "Getting Started",
+      layout: "bullets",
+      content: [
+        { type: "heading", content: "Getting Started" },
+        {
+          type: "bullets",
+          content: [
+            "Start with LangChain, LangGraph, or CrewAI",
+            "Pick a simple, well-defined task",
+            "Add tools incrementally",
+            "Measure, iterate, improve",
+          ],
+        },
+      ],
+      notes: "The best way to learn agents is to build one.",
+    },
+    {
+      id: "slide-8",
+      title: "Thank You",
+      layout: "closing",
+      content: [
+        { type: "heading", content: "Thank You" },
+        { type: "subheading", content: "Questions about Agentic AI?" },
+        { type: "text", content: "Let's continue the conversation." },
+      ],
+      notes: "Open the floor for questions and discussion.",
+    },
+  ],
 };
