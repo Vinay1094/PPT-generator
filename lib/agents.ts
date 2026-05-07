@@ -6,387 +6,261 @@
 
 import {
   Deck,
-  DeckSchema,
   Slide,
-  SlideSchema,
   ContentBlock,
-  ResearchSource,
-  AgentEditRequest,
-  AgentEditResponse,
-  GenerateDeckRequest,
   ColorPalette,
   LayoutType,
+  GenerateDeckRequest,
 } from "./types";
 
-// ============================================================
-// COLOR PALETTE GENERATOR (API-FREE)
-// Generates beautiful color schemes algorithmically
-// ============================================================
-const PALETTES: Record<string, ColorPalette> = {
-  professional: {
-    primary: "#1e40af",
-    secondary: "#3b82f6",
-    accent: "#60a5fa",
-    background: "#f8fafc",
-    text: "#1e293b",
-  },
-  dark: {
-    primary: "#3b82f6",
-    secondary: "#1e40af",
-    accent: "#d946ef",
-    background: "#0f172a",
-    text: "#f8fafc",
-  },
-  light: {
-    primary: "#0ea5e9",
-    secondary: "#0284c7",
-    accent: "#38bdf8",
-    background: "#ffffff",
-    text: "#334155",
-  },
-  creative: {
-    primary: "#8b5cf6",
-    secondary: "#a78bfa",
-    accent: "#c4b5fd",
-    background: "#fdf4ff",
-    text: "#4c1d95",
-  },
-  nature: {
-    primary: "#059669",
-    secondary: "#10b981",
-    accent: "#34d399",
-    background: "#f0fdf4",
-    text: "#064e3b",
-  },
-  warm: {
-    primary: "#d97706",
-    secondary: "#f59e0b",
-    accent: "#fbbf24",
-    background: "#fffbeb",
-    text: "#78350f",
-  },
-};
+// ─── Color palettes ───────────────────────────────────────────────────────────
 
-function getColorPalette(tone: string = "professional"): ColorPalette {
-  const key = tone.toLowerCase();
-  return PALETTES[key] || PALETTES.professional;
+const PALETTES: ColorPalette[] = [
+  { primary: "#6366f1", secondary: "#4f46e5", accent: "#a5b4fc", background: "#0f172a", text: "#f1f5f9" },
+  { primary: "#10b981", secondary: "#059669", accent: "#6ee7b7", background: "#022c22", text: "#ecfdf5" },
+  { primary: "#f59e0b", secondary: "#d97706", accent: "#fcd34d", background: "#1c1917", text: "#fef3c7" },
+  { primary: "#ef4444", secondary: "#dc2626", accent: "#fca5a5", background: "#1a0000", text: "#fff1f2" },
+  { primary: "#3b82f6", secondary: "#2563eb", accent: "#93c5fd", background: "#0c1a2e", text: "#eff6ff" },
+];
+
+export function getColorPalette(topic: string): ColorPalette {
+  const hash = topic.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return PALETTES[hash % PALETTES.length];
 }
 
-// ============================================================
-// LAYOUT SELECTOR (API-FREE)
-// Chooses slide layout based on content type
-// ============================================================
-function selectLayout(slideNumber: number, totalSlides: number): LayoutType {
-  if (slideNumber === 1) return "title";
-  if (slideNumber === totalSlides) return "title";
+// ─── Layout selection ─────────────────────────────────────────────────────────
 
-  const contentTypes: LayoutType[] = [
-    "split",
-    "grid",
-    "body",
-    "quote",
-    "comparison",
-    "data-viz",
-    "image-focused",
+const LAYOUTS: LayoutType[] = ["title", "bullets", "split", "quote", "image", "closing"];
+
+export function selectLayout(index: number, total: number): LayoutType {
+  if (index === 0) return "title";
+  if (index === total - 1) return "closing";
+  return LAYOUTS[1 + (index % (LAYOUTS.length - 2))];
+}
+
+// ─── Research sources (static, no API) ───────────────────────────────────────
+
+export function getResearchSources(topic: string): string[] {
+  return [
+    `Introduction to ${topic}`,
+    `${topic}: Key Concepts and Frameworks`,
+    `${topic} in Practice`,
+    `Future of ${topic}`,
   ];
-
-  return contentTypes[(slideNumber - 2) % contentTypes.length];
 }
 
-// ============================================================
-// RESEARCH SIMULATOR (API-FREE)
-// Simulates web research with curated knowledge
-// ============================================================
-const KNOWLEDGE_BASE: Record<string, ResearchSource[]> = {
-  "default": [
-    {
-      url: "https://en.wikipedia.org",
-      title: "Wikipedia - General Reference",
-      snippet: "Comprehensive encyclopedia with verified information.",
-      credibilityScore: 0.85,
-      extractedAt: new Date().toISOString(),
-    },
-    {
-      url: "https://scholar.google.com",
-      title: "Google Scholar",
-      snippet: "Peer-reviewed academic research and papers.",
-      credibilityScore: 0.95,
-      extractedAt: new Date().toISOString(),
-    },
-    {
-      url: "https://www.nature.com",
-      title: "Nature Research",
-      snippet: "Leading scientific journal for research articles.",
-      credibilityScore: 0.92,
-      extractedAt: new Date().toISOString(),
-    },
-  ],
-  ai: [
-    {
-      url: "https://ai.google/education",
-      title: "Google AI Education",
-      snippet: "Comprehensive AI learning resources and courses.",
-      credibilityScore: 0.9,
-      extractedAt: new Date().toISOString(),
-    },
-    {
-      url: "https://www.deeplearning.ai",
-      title: "DeepLearning.AI",
-      snippet: "Andrew Ng's AI courses and research.",
-      credibilityScore: 0.95,
-      extractedAt: new Date().toISOString(),
-    },
-  ],
-  business: [
-    {
-      url: "https://www.mckinsey.com",
-      title: "McKinsey Insights",
-      snippet: "Management consulting insights and research.",
-      credibilityScore: 0.88,
-      extractedAt: new Date().toISOString(),
-    },
-    {
-      url: "https://hbr.org",
-      title: "Harvard Business Review",
-      snippet: "Business management and strategy articles.",
-      credibilityScore: 0.9,
-      extractedAt: new Date().toISOString(),
-    },
-  ],
-};
+// ─── Topic templates ──────────────────────────────────────────────────────────
 
-function getResearchSources(topic: string): ResearchSource[] {
-  const key = Object.keys(KNOWLEDGE_BASE).find((k) =>
-    topic.toLowerCase().includes(k)
-  );
-  return key ? KNOWLEDGE_BASE[key] : KNOWLEDGE_BASE["default"];
+function getTopicTemplate(
+  topic: string,
+  slideIndex: number,
+  total: number
+): { title: string; bullets: string[] } {
+  const templates = [
+    { title: `Introduction to ${topic}`, bullets: [`What is ${topic}?`, `Why ${topic} matters`, `Key principles of ${topic}`] },
+    { title: `Core Concepts`, bullets: [`Foundational ideas`, `Building blocks`, `Essential terminology`] },
+    { title: `How It Works`, bullets: [`Step-by-step process`, `Underlying mechanisms`, `Real-world workflow`] },
+    { title: `Key Benefits`, bullets: [`Efficiency gains`, `Cost reduction`, `Quality improvements`, `Competitive advantage`] },
+    { title: `Challenges & Solutions`, bullets: [`Common obstacles`, `Proven strategies`, `Lessons learned`] },
+    { title: `Real-World Examples`, bullets: [`Industry case studies`, `Success stories`, `Measurable outcomes`] },
+    { title: `Best Practices`, bullets: [`Proven approaches`, `Expert recommendations`, `Implementation tips`] },
+    { title: `Future Outlook`, bullets: [`Emerging trends`, `Upcoming innovations`, `Market predictions`] },
+    { title: `Getting Started`, bullets: [`First steps`, `Required resources`, `Quick wins`] },
+    { title: `Summary & Next Steps`, bullets: [`Key takeaways`, `Action items`, `Further reading`] },
+  ];
+  return templates[slideIndex % templates.length];
 }
 
-// ============================================================
-// CONTENT GENERATOR (API-FREE)
-// Generates slide content based on topic templates
-// ============================================================
-const CONTENT_TEMPLATES: Record<string, string[][]> = {
-  agenticAI: [
-    ["What is Agentic AI?", "AI systems that plan, reason, and act autonomously.", "Bullet:Reasoning & Planning,Bullet:Tool Use,Bullet:Memory & Context"],
-    ["Agent Architecture", "Observe → Think → Act loop", "Callout:Agents can use external tools and APIs"],
-    ["Key Capabilities", "Core features of autonomous agents", "Bullet:Multi-step Tasks,Bullet:Context Awareness,Bullet:Self-Correction"],
-    ["Use Cases", "Real-world applications", "Bullet:Customer Support,Bullet:Data Analysis,Bullet:Workflow Automation"],
-    ["Market Trends", "Industry growth and adoption", "Callout:$500B+ market by 2030"],
-    ["Challenges", "Key obstacles and concerns", "Bullet:Ethical AI,Bullet:Transparency,Bullet:Control & Safety"],
-    ["Future Outlook", "Where agentic AI is headed", "Bullet:Multi-Agent Systems,Bullet:Self-Improving Agents,Bullet:AGI Pathway"],
-    ["Getting Started", "Tools and frameworks", "Bullet:LangChain,Bullet:CrewAI,Bullet:AutoGen"],
-  ],
-  default: [
-    ["Introduction", "Key overview of the topic", "Bullet:Context,Bullet:Importance,Bullet:Scope"],
-    ["Background", "Historical context and origins", "Bullet:Evolution,Bullet:Milestones,Bullet:Current State"],
-    ["Core Concepts", "Fundamental ideas and principles", "Bullet:Concept 1,Bullet:Concept 2,Bullet:Concept 3"],
-    ["Methodology", "How it works in practice", "Bullet:Process 1,Bullet:Process 2,Bullet:Process 3"],
-    ["Applications", "Real-world use cases", "Bullet:Industry A,Bullet:Industry B,Bullet:Industry C"],
-    ["Benefits", "Why it matters", "Bullet:Benefit 1,Bullet:Benefit 2,Bullet:Benefit 3"],
-    ["Challenges", "Obstacles and limitations", "Bullet:Challenge 1,Bullet:Challenge 2,Bullet:Challenge 3"],
-    ["Future", "Trends and predictions", "Bullet:Trend 1,Bullet:Trend 2,Bullet:Outlook"],
-  ],
-};
+// ─── Content block builders ───────────────────────────────────────────────────
 
-function getTopicTemplate(topic: string): string[][] {
-  const key = Object.keys(CONTENT_TEMPLATES).find((k) =>
-    topic.toLowerCase().includes(k)
-  );
-  return key ? CONTENT_TEMPLATES[key] : CONTENT_TEMPLATES["default"];
+function buildTitleSlide(topic: string, palette: ColorPalette): ContentBlock[] {
+  return [
+    { type: "heading", content: topic },
+    { type: "subheading", content: `A comprehensive overview` },
+  ];
 }
 
-function parseBlock(type: string, content: string): ContentBlock {
-  if (type === "Bullet") {
-    return { type: "bullet", content: content.replace(/^Bullet:/, "") };
-  }
-  if (type === "Callout") {
-    return { type: "callout", content: content.replace(/^Callout:/, "") };
-  }
-  if (type === "Heading") {
-    return { type: "heading", content: content };
-  }
-  return { type: "body", content: content };
+function buildBulletSlide(title: string, bullets: string[]): ContentBlock[] {
+  return [
+    { type: "heading", content: title },
+    { type: "bullets", content: bullets },
+  ];
 }
 
-function generateSlideContent(
-  slideNumber: number,
-  layoutType: LayoutType,
-  templateRow: string[]
-): ContentBlock[] {
-  const blocks: ContentBlock[] = [];
-
-  if (slideNumber === 1) {
-    blocks.push({ type: "heading", content: templateRow[0] });
-    blocks.push({ type: "body", content: templateRow[1] });
-    return blocks;
-  }
-
-  // Parse the content row
-  const contentStr = templateRow[2] || "";
-  const items = contentStr.split(",");
-
-  items.forEach((item) => {
-    const [type, ...contentParts] = item.split(":");
-    const content = contentParts.join(":").trim();
-    if (content) blocks.push(parseBlock(type || "Body", content));
-  });
-
-  // Add heading if not present
-  if (!blocks.some((b) => b.type === "heading") && templateRow[0]) {
-    blocks.unshift({ type: "heading", content: templateRow[0] });
-  }
-
-  if (!blocks.some((b) => b.type === "body") && templateRow[1]) {
-    blocks.splice(1, 0, { type: "body", content: templateRow[1] });
-  }
-
-  return blocks;
+function buildClosingSlide(topic: string): ContentBlock[] {
+  return [
+    { type: "heading", content: `Thank You` },
+    { type: "subheading", content: `Questions about ${topic}?` },
+    { type: "text", content: `Let's continue the conversation.` },
+  ];
 }
 
-// ============================================================
-// DESIGNER (API-FREE)
-// Generates Tailwind CSS classes for each layout
-// ============================================================
-const LAYOUT_MAP: Record<string, string> = {
-  title: "flex flex-col items-center justify-center text-center h-full gap-8",
-  split: "grid grid-cols-2 gap-8 h-full",
-  grid: "grid grid-cols-2 gap-6 h-full",
-  body: "flex flex-col gap-6 h-full",
-  quote: "flex flex-col items-center justify-center text-center h-full",
-  comparison: "grid grid-cols-2 gap-8 h-full",
-  "image-focused": "grid grid-cols-3 gap-4 h-full",
-  "data-viz": "flex flex-col gap-4 h-full",
-};
-
-function designSlide(slide: Slide): string {
-  return LAYOUT_MAP[slide.layoutType] || LAYOUT_MAP.body;
+function buildQuoteSlide(topic: string): ContentBlock[] {
+  return [
+    { type: "heading", content: "Key Insight" },
+    { type: "quote", content: `The future belongs to those who master ${topic}.` },
+  ];
 }
 
-// ============================================================
-// AGENT EDIT (API-FREE)
-// Rule-based slide editing with pattern matching
-// ============================================================
-const EDIT_RULES: Record<string, (slide: Slide) => Partial<Slide>> = {
-  professional: (slide) => ({
-    colorPalette: PALETTES.professional,
-    visualMetaphor: "Professional corporate design with clean lines",
-  }),
-  dark: (slide) => ({
-    colorPalette: PALETTES.dark,
-    visualMetaphor: "Dark theme with modern aesthetics",
-  }),
-  creative: (slide) => ({
-    colorPalette: PALETTES.creative,
-    visualMetaphor: "Creative design with vibrant colors",
-  }),
-  simple: (slide) => ({
-    layoutType: "body",
-    colorPalette: PALETTES.light,
-    visualMetaphor: "Minimalist clean layout",
-  }),
-  detailed: (slide) => ({
-    layoutType: "grid",
-    visualMetaphor: "Detailed information layout with multiple sections",
-  }),
-};
-
-function interpretInstruction(instruction: string): string {
-  const instr = instruction.toLowerCase();
-  if (instr.includes("professional")) return "professional";
-  if (instr.includes("dark")) return "dark";
-  if (instr.includes("creative")) return "creative";
-  if (instr.includes("simple")) return "simple";
-  if (instr.includes("detailed")) return "detailed";
-  return "";
+function buildSplitSlide(title: string, bullets: string[]): ContentBlock[] {
+  const half = Math.ceil(bullets.length / 2);
+  return [
+    { type: "heading", content: title },
+    { type: "bullets", content: bullets.slice(0, half) },
+    { type: "bullets", content: bullets.slice(half) },
+  ];
 }
 
-function agentEdit(slide: Slide, instruction: string): AgentEditResponse {
-  const ruleKey = interpretInstruction(instruction);
+// ─── Slide builder ────────────────────────────────────────────────────────────
 
-  if (!ruleKey) {
-    return {
-      slideNumber: slide.slideNumber,
-      updatedBlocks: slide.blocks,
-      reason: "No matching edit rule found. Try: professional, dark, creative, simple, or detailed",
-    };
+function buildSlide(
+  topic: string,
+  slideIndex: number,
+  totalSlides: number,
+  palette: ColorPalette
+): Slide {
+  const layout = selectLayout(slideIndex, totalSlides);
+  const template = getTopicTemplate(topic, slideIndex, totalSlides);
+  const now = new Date().toISOString();
+
+  let content: ContentBlock[];
+  switch (layout) {
+    case "title":
+      content = buildTitleSlide(topic, palette);
+      break;
+    case "closing":
+      content = buildClosingSlide(topic);
+      break;
+    case "quote":
+      content = buildQuoteSlide(topic);
+      break;
+    case "split":
+      content = buildSplitSlide(template.title, template.bullets);
+      break;
+    default:
+      content = buildBulletSlide(template.title, template.bullets);
   }
-
-  const updater = EDIT_RULES[ruleKey];
-  const updates = updater(slide);
 
   return {
-    slideNumber: slide.slideNumber,
-    updatedBlocks: slide.blocks,
-    updatedColorPalette: updates.colorPalette,
-    updatedLayoutType: updates.layoutType,
-    reason: `Applied ${ruleKey} style transformation`,
+    id: `slide-${slideIndex + 1}`,
+    title: template.title,
+    layout,
+    content,
+    notes: `Speaker notes for slide ${slideIndex + 1}: ${template.title}`,
   };
 }
 
-// ============================================================
-// MAIN PIPELINE (API-FREE)
-// Orchestrates all agents without external APIs
-// ============================================================
-export function runResearchFirstPipeline(
-  request: GenerateDeckRequest
-): Deck {
-  const { topic, targetAudience, slideCount, tone } = request;
+// ─── Main pipeline ────────────────────────────────────────────────────────────
 
-  // Step 1: Research (simulated)
-  const sources = getResearchSources(topic);
-
-  // Step 2: Strategy (template-based)
-  const template = getTopicTemplate(topic);
-  const palette = getColorPalette(tone);
-
-  // Step 3: Design (layout selection)
-  const adjustedCount = Math.min(slideCount, template.length + 2);
-
-  const slides: Slide[] = [];
-
-  for (let i = 1; i <= adjustedCount; i++) {
-    const layoutType = selectLayout(i, adjustedCount);
-    const templateRow =
-      i === 1
-        ? [topic, targetAudience || "Comprehensive overview", "Body:An AI-powered research presentation"]
-        : i === adjustedCount
-        ? ["Thank You", "Questions and Discussion", "Heading:Contact Information,Body:Openspark.ai"]
-        : template[(i - 2) % template.length];
-
-    const blocks = generateSlideContent(i, layoutType, templateRow);
-    const isDark = layoutType === "title" && i === 1;
-
-    slides.push({
-      slideNumber: i,
-      title: templateRow[0],
-      subtitle: templateRow[1],
-      layoutType,
-      colorPalette: isDark ? PALETTES.dark : palette,
-      visualMetaphor: `Auto-generated ${layoutType} layout theme`,
-      blocks,
-      sources: i <= 2 ? sources : undefined,
-      notes: `Generated by OpenSpark for topic: ${topic}`,
-    });
-  }
-
-  // Step 4: Design phase
-  slides.forEach((slide) => designSlide(slide));
-
-  // Validate and return
+export function runResearchFirstPipeline(request: GenerateDeckRequest): Deck {
+  const { topic, slideCount = 8 } = request;
+  const palette = getColorPalette(topic);
   const now = new Date().toISOString();
-  const deck: Deck = {
+
+  const slides: Slide[] = Array.from({ length: slideCount }, (_, i) =>
+    buildSlide(topic, i, slideCount, palette)
+  );
+
+  return {
     title: topic,
-    subtitle: targetAudience ? `For ${targetAudience}` : undefined,
-    author: "OpenSpark AI",
     topic,
     slides,
+    colorPalette: palette,
     createdAt: now,
     updatedAt: now,
     version: 1,
   };
-
-  return deck;
 }
 
-export { agentEdit, designSlide, getResearchSources };
+// ─── AI Edit agent (rule-based, API-free) ─────────────────────────────────────
+
+function applyInstruction(slide: Slide, instruction: string): Slide {
+  const lower = instruction.toLowerCase();
+
+  // Simplify / make concise
+  if (lower.includes("concis") || lower.includes("shorter") || lower.includes("simpl")) {
+    return {
+      ...slide,
+      content: slide.content.map((block) => {
+        if (block.type === "bullets" && Array.isArray(block.content)) {
+          return { ...block, content: (block.content as string[]).slice(0, 3) };
+        }
+        if (block.type === "text" && typeof block.content === "string") {
+          const sentences = (block.content as string).split(".").filter(Boolean);
+          return { ...block, content: sentences.slice(0, 2).join(".") + "." };
+        }
+        return block;
+      }),
+    };
+  }
+
+  // Add more detail / expand
+  if (lower.includes("more detail") || lower.includes("expand") || lower.includes("elaborat")) {
+    return {
+      ...slide,
+      content: slide.content.map((block) => {
+        if (block.type === "bullets" && Array.isArray(block.content)) {
+          const extra = ["Additional context", "Supporting evidence", "Key consideration"];
+          return { ...block, content: [...(block.content as string[]), ...extra] };
+        }
+        return block;
+      }),
+    };
+  }
+
+  // Change layout to bullets
+  if (lower.includes("bullet") || lower.includes("list")) {
+    const headingBlock = slide.content.find((b) => b.type === "heading");
+    return {
+      ...slide,
+      layout: "bullets" as LayoutType,
+      content: [
+        headingBlock || { type: "heading" as const, content: slide.title },
+        { type: "bullets", content: ["Key point 1", "Key point 2", "Key point 3"] },
+      ],
+    };
+  }
+
+  // Change to quote layout
+  if (lower.includes("quote") || lower.includes("insight")) {
+    return {
+      ...slide,
+      layout: "quote" as LayoutType,
+      content: [
+        { type: "heading" as const, content: "Key Insight" },
+        { type: "quote", content: `Insight about ${slide.title}` },
+      ],
+    };
+  }
+
+  // Add a note
+  if (lower.includes("note") || lower.includes("speaker")) {
+    return { ...slide, notes: instruction };
+  }
+
+  // Default: update the title to reflect instruction
+  return {
+    ...slide,
+    content: slide.content.map((block) =>
+      block.type === "subheading"
+        ? { ...block, content: `Updated: ${instruction.slice(0, 60)}` }
+        : block
+    ),
+  };
+}
+
+export function agentEdit(deck: Deck, slideIndex: number, instruction: string): Deck {
+  if (slideIndex < 0 || slideIndex >= deck.slides.length) {
+    throw new Error(`Invalid slide index: ${slideIndex}. Deck has ${deck.slides.length} slides.`);
+  }
+
+  const updatedSlides = deck.slides.map((slide, i) =>
+    i === slideIndex ? applyInstruction(slide, instruction) : slide
+  );
+
+  return {
+    ...deck,
+    slides: updatedSlides,
+    updatedAt: new Date().toISOString(),
+  };
+}
