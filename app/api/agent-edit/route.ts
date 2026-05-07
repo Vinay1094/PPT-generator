@@ -1,36 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resumePipeline } from "@/lib/agents";
+import { agentEdit } from "@/lib/agents";
 import {
   AgentEditRequestSchema,
   AgentEditResponseSchema,
   AgentEditResponse,
 } from "@/lib/types";
+import { SAMPLE_DECK } from "@/lib/sample-data";
 
 // POST /api/agent-edit
-// Natural language editing of a slide's content
+// API-free natural language slide editing using rule-based patterns
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const validated = AgentEditRequestSchema.parse(body);
     const { slideNumber, instruction } = validated;
 
-    // In a real implementation, we'd need the full slide context
-    // For now, we'll use the stub from agents.ts
-    // The slide would typically be passed from the client or stored server-side
+    // Get the current slide from sample deck
+    const slide = SAMPLE_DECK.slides.find((s) => s.slideNumber === slideNumber);
 
-    const response: AgentEditResponse = {
-      slideNumber,
-      updatedBlocks: [],
-      reason: "Agent edit processed",
-    };
+    if (!slide) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Slide " + slideNumber + " not found. Available: 1-" + SAMPLE_DECK.slides.length,
+        },
+        { status: 404 }
+      );
+    }
 
-    // Validate response schema
-    const validatedResponse = AgentEditResponseSchema.parse(response);
+    // Apply rule-based edit
+    const result: AgentEditResponse = agentEdit(slide, instruction);
+
+    // Validate response
+    const validatedResult = AgentEditResponseSchema.parse(result);
 
     return NextResponse.json(
       {
         success: true,
-        ...validatedResponse,
+        ...validatedResult,
       },
       { status: 200 }
     );
@@ -40,10 +47,22 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error: isZodError
-          ? "Invalid edit request. Include slideNumber and instruction."
+          ? "Invalid request. Include slideNumber and instruction."
           : error?.message || "Edit failed",
+        details: isZodError ? error?.issues : undefined,
       },
       { status: isZodError ? 400 : 500 }
     );
   }
+}
+
+// GET for health check
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    service: "OpenSpark Agent Edit API",
+    version: "0.1.0",
+    apiFree: true,
+    rules: ["professional", "dark", "creative", "simple", "detailed"],
+  });
 }
