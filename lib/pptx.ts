@@ -1,186 +1,139 @@
 import PptxGenJS from "pptxgenjs";
-import { Deck, Slide, ContentBlock, ColorPalette, LayoutType } from "./types";
+import { Deck, Slide, ColorPalette } from "./types";
 
-// SLIDE DIMENSIONS: 16:9 ratio at standard size
-const SLIDE_WIDTH = 13.333; // inches (1280 / 96)
-const SLIDE_HEIGHT = 7.5;   // inches (720 / 96)
+const SLIDE_WIDTH = 13.333;
+const SLIDE_HEIGHT = 7.5;
 
-// Convert hex color (with or without #) to clean hex string
 function cleanColor(hex: string): string {
   return hex.replace("#", "");
 }
 
 // Map layout type to a pptxgenjs-compatible layout name
-function getLayoutName(layout: LayoutType): string {
-  const map: Record<LayoutType, string> = {
-    title: "TITLE_SLIDE",
-    "two-column": "TITLE_AND_CONTENT",
-    bullets: "TITLE_AND_CONTENT",
-    image: "TITLE_AND_CONTENT",
-    quote: "BLANK",
-    closing: "BLANK",
-  };
-  return map[layout] || "TITLE_AND_CONTENT";
-}
+const LAYOUT_MAP: Record<string, string> = {
+  "title": "TITLE",
+  "bullets": "TITLE_AND_CONTENT",
+  "two-column": "TITLE_AND_CONTENT",
+  "image": "TITLE_AND_CONTENT",
+  "quote": "TITLE_AND_CONTENT",
+  "closing": "TITLE_AND_CONTENT",
+  "split": "TITLE_AND_CONTENT",
+  "grid": "TITLE_AND_CONTENT",
+  "body": "TITLE_AND_CONTENT",
+  "comparison": "TITLE_AND_CONTENT",
+  "image-focused": "TITLE_AND_CONTENT",
+  "data-viz": "TITLE_AND_CONTENT",
+};
 
-// Render a single content block onto a pptxgenjs slide
-function renderBlock(
-  pptxSlide: PptxGenJS.Slide,
-  block: ContentBlock,
-  palette: ColorPalette
-): void {
-  switch (block.type) {
-    case "heading": {
-      pptxSlide.addText(block.content as string, {
-        x: 0.5,
-        y: 0.4,
-        w: SLIDE_WIDTH - 1,
-        h: 1.2,
-        fontSize: 36,
-        bold: true,
-        color: cleanColor(palette.text),
-        fontFace: "Calibri",
-        align: "left",
-      });
-      break;
-    }
-    case "subheading": {
-      pptxSlide.addText(block.content as string, {
-        x: 0.5,
-        y: 1.7,
-        w: SLIDE_WIDTH - 1,
-        h: 0.8,
-        fontSize: 24,
-        bold: false,
-        color: cleanColor(palette.accent),
-        fontFace: "Calibri",
-        align: "left",
-      });
-      break;
-    }
-    case "bullets": {
-      const items = Array.isArray(block.content)
-        ? (block.content as string[])
-        : [block.content as string];
-      const bulletItems = items.map((text) => ({
-        text,
-        options: { bullet: true, fontSize: 18, color: cleanColor(palette.text) },
-      }));
-      pptxSlide.addText(bulletItems, {
-        x: 0.5,
-        y: 2.0,
-        w: SLIDE_WIDTH - 1,
-        h: SLIDE_HEIGHT - 2.8,
-        fontFace: "Calibri",
-        valign: "top",
-      });
-      break;
-    }
-    case "text": {
-      pptxSlide.addText(block.content as string, {
-        x: 0.5,
-        y: 2.0,
-        w: SLIDE_WIDTH - 1,
-        h: SLIDE_HEIGHT - 2.8,
-        fontSize: 18,
-        color: cleanColor(palette.text),
-        fontFace: "Calibri",
-        align: "left",
-        valign: "top",
-        wrap: true,
-      });
-      break;
-    }
-    case "quote": {
-      pptxSlide.addText(`"${block.content as string}"`, {
-        x: 1.0,
-        y: 2.5,
-        w: SLIDE_WIDTH - 2,
-        h: 3.0,
-        fontSize: 28,
-        italic: true,
-        color: cleanColor(palette.accent),
-        fontFace: "Calibri",
-        align: "center",
-        valign: "middle",
-      });
-      break;
-    }
-    case "image": {
-      // Placeholder box when no actual image binary is available
-      pptxSlide.addShape("rect" as PptxGenJS.SHAPE_NAME, {
-        x: 0.5,
-        y: 2.0,
-        w: SLIDE_WIDTH - 1,
-        h: SLIDE_HEIGHT - 3,
-        fill: { color: cleanColor(palette.secondary) },
-        line: { color: cleanColor(palette.accent), width: 1 },
-      });
-      pptxSlide.addText("[ Image Placeholder ]", {
-        x: 0.5,
-        y: 2.0,
-        w: SLIDE_WIDTH - 1,
-        h: SLIDE_HEIGHT - 3,
-        fontSize: 16,
-        color: cleanColor(palette.text),
-        align: "center",
-        valign: "middle",
-        fontFace: "Calibri",
-      });
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-// Build and export the full deck as a PPTX Blob
-export async function exportDeckToPptx(deck: Deck): Promise<Blob> {
+export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
   const pptx = new PptxGenJS();
 
-  // Presentation-level settings
   pptx.layout = "LAYOUT_WIDE";
-  pptx.author = "PPT Generator";
-  pptx.company = "Open Source";
   pptx.title = deck.title;
+  pptx.author = "OpenSpark PPT Generator";
 
-  const palette: ColorPalette = deck.colorPalette;
+  const palette: ColorPalette = deck.colorPalette ?? {
+    primary: "#1E40AF",
+    secondary: "#3B82F6",
+    accent: "#F59E0B",
+    background: "#FFFFFF",
+    text: "#111827",
+  };
+
+  const bgColor = cleanColor(palette.background);
+  const primaryColor = cleanColor(palette.primary);
+  const textColor = cleanColor(palette.text);
 
   for (const slide of deck.slides) {
-    const pptxSlide = pptx.addSlide();
+    const pSlide = pptx.addSlide();
 
-    // Background fill
-    pptxSlide.background = { color: cleanColor(palette.background) };
+    // Background
+    pSlide.background = { color: bgColor };
 
-    // Accent bar at top
-    pptxSlide.addShape("rect" as PptxGenJS.SHAPE_NAME, {
-      x: 0,
-      y: 0,
-      w: SLIDE_WIDTH,
-      h: 0.12,
-      fill: { color: cleanColor(palette.primary) },
-      line: { color: cleanColor(palette.primary), width: 0 },
+    // Title
+    pSlide.addText(slide.title ?? "", {
+      x: 0.5,
+      y: 0.3,
+      w: SLIDE_WIDTH - 1,
+      h: 1.0,
+      fontSize: 32,
+      bold: true,
+      color: primaryColor,
+      fontFace: "Arial",
     });
 
-    // Render each content block
-    for (const block of slide.content) {
-      renderBlock(pptxSlide, block, palette);
+    // Subtitle (if present)
+    if (slide.subtitle) {
+      pSlide.addText(slide.subtitle, {
+        x: 0.5,
+        y: 1.4,
+        w: SLIDE_WIDTH - 1,
+        h: 0.6,
+        fontSize: 18,
+        color: textColor,
+        fontFace: "Arial",
+      });
+    }
+
+    // Content blocks
+    let yPos = slide.subtitle ? 2.1 : 1.5;
+    for (const block of slide.content ?? []) {
+      if (block.type === "bullets" && Array.isArray(block.items)) {
+        const bulletItems = block.items.map((item: string) => ({
+          text: item,
+          options: { bullet: true, fontSize: 16, color: textColor, fontFace: "Arial" },
+        }));
+        pSlide.addText(bulletItems, {
+          x: 0.5,
+          y: yPos,
+          w: SLIDE_WIDTH - 1,
+          h: Math.min(block.items.length * 0.45 + 0.3, SLIDE_HEIGHT - yPos - 0.5),
+          fontFace: "Arial",
+        });
+        yPos += block.items.length * 0.45 + 0.5;
+      } else if (block.type === "text" && block.content) {
+        pSlide.addText(block.content, {
+          x: 0.5,
+          y: yPos,
+          w: SLIDE_WIDTH - 1,
+          h: 0.6,
+          fontSize: 16,
+          color: textColor,
+          fontFace: "Arial",
+        });
+        yPos += 0.7;
+      } else if (block.type === "quote" && block.content) {
+        pSlide.addText(`"${block.content}"`, {
+          x: 1.0,
+          y: yPos,
+          w: SLIDE_WIDTH - 2,
+          h: 1.0,
+          fontSize: 20,
+          italic: true,
+          color: primaryColor,
+          fontFace: "Arial",
+        });
+        yPos += 1.2;
+      } else if (block.type === "heading" && block.content) {
+        pSlide.addText(block.content, {
+          x: 0.5,
+          y: yPos,
+          w: SLIDE_WIDTH - 1,
+          h: 0.5,
+          fontSize: 20,
+          bold: true,
+          color: primaryColor,
+          fontFace: "Arial",
+        });
+        yPos += 0.7;
+      }
     }
 
     // Speaker notes
-    if (slide.notes) {
-      pptxSlide.addNotes(slide.notes);
+    if (slide.speakerNotes) {
+      pSlide.addNotes(slide.speakerNotes);
     }
   }
 
-  // Write to base64 and convert to Blob
-  const base64 = await pptx.write({ outputType: "base64" }) as string;
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new Blob([bytes], {
-    type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  });
+  const data = await pptx.write({ outputType: "uint8array" });
+  return data as Uint8Array;
 }
