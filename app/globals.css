@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Slide canvas 16:9 aspect ratio */
+.slide-canvas {
+  width: 1280px;
+  height: 720px;
+  aspect-ratio: 16 / 9;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.slide-canvas.dark {
+  background: #0f172a;
+}
+
+/* Agent typing indicator */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.agent-thinking {
+  animation: pulse-subtle 1.5s ease-in-out infinite;
+}
+
+/* Slide preview scrollbar */
+.slide-preview::-webkit-scrollbar {
+  width: 8px;
+}
+
+.slide-preview::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.slide-preview::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.slide-preview::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Agent status badges */
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.agent-badge.researcher {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.agent-badge.strategist {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.agent-badge.designer {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+/* Fact check overlay */
+.fact-check-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  max-width: 280px;
+  pointer-events: auto;
+}
+
+.fact-check-overlay.credible {
+  border-color: #22c55e;
+  background: rgba(220, 252, 231, 0.95);
+}
+
+.fact-check-overlay.suspicious {
+  border-color: #ef4444;
+  background: rgba(254, 226, 226, 0.95);
+}
