@@ -1,68 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { agentEdit } from "@/lib/agents";
-import {
-  AgentEditRequestSchema,
-  AgentEditResponseSchema,
-  AgentEditResponse,
-} from "@/lib/types";
-import { SAMPLE_DECK } from "@/lib/sample-data";
+import { agentEdit, runResearchFirstPipeline } from "@/lib/agents";
+import { AgentEditRequestSchema } from "@/lib/types";
 
 // POST /api/agent-edit
 // API-free natural language slide editing using rule-based patterns
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const validated = AgentEditRequestSchema.parse(body);
-    const { slideNumber, instruction } = validated;
+    const { deck, slideIndex, instruction } = AgentEditRequestSchema.parse(body);
 
-    // Get the current slide from sample deck
-    const slide = SAMPLE_DECK.slides.find((s) => s.slideNumber === slideNumber);
-
-    if (!slide) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Slide " + slideNumber + " not found. Available: 1-" + SAMPLE_DECK.slides.length,
-        },
-        { status: 404 }
-      );
-    }
-
-    // Apply rule-based edit
-    const result: AgentEditResponse = agentEdit(slide, instruction);
-
-    // Validate response
-    const validatedResult = AgentEditResponseSchema.parse(result);
+    // Apply rule-based edit to the specified slide
+    const updatedDeck = agentEdit(deck, slideIndex, instruction);
 
     return NextResponse.json(
-      {
-        success: true,
-        ...validatedResult,
-      },
+      { deck: updatedDeck, message: "Slide updated successfully" },
       { status: 200 }
     );
-  } catch (error: any) {
-    const isZodError = error?.name === "ZodError";
+  } catch (error) {
+    console.error("Agent edit error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: isZodError
-          ? "Invalid request. Include slideNumber and instruction."
-          : error?.message || "Edit failed",
-        details: isZodError ? error?.issues : undefined,
-      },
-      { status: isZodError ? 400 : 500 }
+      { error: error instanceof Error ? error.message : "Edit failed" },
+      { status: 500 }
     );
   }
 }
 
-// GET for health check
+// GET /api/agent-edit - health check
 export async function GET() {
-  return NextResponse.json({
-    status: "ok",
-    service: "OpenSpark Agent Edit API",
-    version: "0.1.0",
-    apiFree: true,
-    rules: ["professional", "dark", "creative", "simple", "detailed"],
-  });
+  return NextResponse.json({ status: "ok", mode: "api-free" });
 }
