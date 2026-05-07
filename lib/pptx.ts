@@ -8,6 +8,12 @@ function cleanColor(hex: string): string {
   return hex.replace("#", "");
 }
 
+function contentToString(content: string | string[] | Record<string, unknown>): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.join(", ");
+  return JSON.stringify(content);
+}
+
 export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
   const pptx = new PptxGenJS();
 
@@ -15,13 +21,7 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
   pptx.title = deck.title;
   pptx.author = "OpenSpark PPT Generator";
 
-  const palette: ColorPalette = deck.colorPalette ?? {
-    primary: "#1E40AF",
-    secondary: "#3B82F6",
-    accent: "#F59E0B",
-    background: "#FFFFFF",
-    text: "#111827",
-  };
+  const palette: ColorPalette = deck.colorPalette;
 
   const bgColor = cleanColor(palette.background);
   const primaryColor = cleanColor(palette.primary);
@@ -44,25 +44,17 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
       fontFace: "Arial",
     });
 
-    // Subtitle
-    if (slide.subtitle) {
-      pSlide.addText(slide.subtitle, {
-        x: 0.5,
-        y: 1.4,
-        w: SLIDE_WIDTH - 1,
-        h: 0.6,
-        fontSize: 18,
-        color: textColor,
-        fontFace: "Arial",
-      });
-    }
-
     // Content blocks
-    let yPos = slide.subtitle ? 2.1 : 1.5;
+    let yPos = 1.5;
     for (const block of slide.content ?? []) {
-      if (block.type === "bullets" && Array.isArray(block.items) && block.items.length > 0) {
-        // Render each bullet as a separate text box
-        for (const item of block.items) {
+      if (block.type === "bullets") {
+        const items = Array.isArray(block.content)
+          ? (block.content as string[])
+          : typeof block.content === "string"
+          ? block.content.split("\n")
+          : [];
+        for (const item of items) {
+          if (yPos > SLIDE_HEIGHT - 0.5) break;
           pSlide.addText("• " + item, {
             x: 0.7,
             y: yPos,
@@ -73,13 +65,14 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
             fontFace: "Arial",
           });
           yPos += 0.45;
-          if (yPos > SLIDE_HEIGHT - 0.5) break;
         }
         yPos += 0.1;
       } else if (block.content) {
+        const text = contentToString(block.content);
         const isQuote = block.type === "quote";
         const isHeading = block.type === "heading" || block.type === "subheading";
-        pSlide.addText(isQuote ? `"${block.content}"` : block.content, {
+        if (yPos > SLIDE_HEIGHT - 0.5) break;
+        pSlide.addText(isQuote ? `"${text}"` : text, {
           x: isQuote ? 1.0 : 0.5,
           y: yPos,
           w: isQuote ? SLIDE_WIDTH - 2 : SLIDE_WIDTH - 1,
@@ -92,10 +85,8 @@ export async function exportDeckToPptx(deck: Deck): Promise<Uint8Array> {
         });
         yPos += isQuote ? 1.2 : 0.65;
       }
-      if (yPos > SLIDE_HEIGHT - 0.5) break;
     }
 
-    // Speaker notes (field is 'notes' in the Slide type)
     if (slide.notes) {
       pSlide.addNotes(slide.notes);
     }
