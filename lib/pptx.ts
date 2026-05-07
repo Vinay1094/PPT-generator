@@ -5,177 +5,182 @@ import { Deck, Slide, ContentBlock, ColorPalette, LayoutType } from "./types";
 const SLIDE_WIDTH = 13.333; // inches (1280 / 96)
 const SLIDE_HEIGHT = 7.5;   // inches (720 / 96)
 
-// Convert tailwind hex to hex without #
+// Convert hex color (with or without #) to clean hex string
 function cleanColor(hex: string): string {
   return hex.replace("#", "");
 }
 
-// Map layout type to pptxgenjs shapes
-function addSlideBlocks(
-  slide: PptxGenJS.Slide,
-  blocks: ContentBlock[],
-  palette: ColorPalette,
-  layoutType: LayoutType
-) {
-  const textColor = cleanColor(palette.text);
-  const accentColor = cleanColor(palette.accent);
-  const bg = cleanColor(palette.background);
-
-  let y = layoutType === "title" ? SLIDE_HEIGHT * 0.3 : 0.5;
-  const lineHeight = 0.5;
-
-  blocks.forEach((block, i) => {
-    const opts: Partial<PptxGenJS.TextProps> = {
-      x: 0.5,
-      y,
-      w: SLIDE_WIDTH - 1,
-      h: lineHeight,
-      color: textColor,
-      fontSize: block.type === "heading" ? 32 : 18,
-      bold: block.type === "heading" || block.type === "callout",
-      valign: "middle",
-      fill: { color: bg },
-    };
-
-    // Style variations by type
-    if (block.type === "callout") {
-      opts.fill = { color: accentColor };
-      opts.color = cleanColor(palette.background);
-      opts.shape = "rectangle";
-      opts.line = { color: accentColor, width: 2 };
-    }
-
-    if (block.type === "bullet") {
-      opts.bullet = { type: "number", color: accentColor };
-      opts.color = palette.text.startsWith("#") ? opts.color : "000000";
-    }
-
-    if (block.type === "heading") {
-      opts.align = layoutType === "title" ? "center" : "left";
-      opts.fontSize = layoutType === "title" ? 44 : 28;
-    }
-
-    slide.addText(block.content, opts);
-    y += lineHeight + 0.15;
-  });
+// Map layout type to a pptxgenjs-compatible layout name
+function getLayoutName(layout: LayoutType): string {
+  const map: Record<LayoutType, string> = {
+    title: "TITLE_SLIDE",
+    "two-column": "TITLE_AND_CONTENT",
+    bullets: "TITLE_AND_CONTENT",
+    image: "TITLE_AND_CONTENT",
+    quote: "BLANK",
+    closing: "BLANK",
+  };
+  return map[layout] || "TITLE_AND_CONTENT";
 }
 
-// Add shape/icon based on layout type
-function addLayoutShapes(
-  slide: PptxGenJS.Slide,
-  layoutType: LayoutType,
+// Render a single content block onto a pptxgenjs slide
+function renderBlock(
+  pptxSlide: PptxGenJS.Slide,
+  block: ContentBlock,
   palette: ColorPalette
-) {
-  const accent = cleanColor(palette.accent);
-  const primary = cleanColor(palette.primary);
-
-  if (layoutType === "split") {
-    // Vertical divider line
-    slide.addShape("line", {
-      x: SLIDE_WIDTH / 2,
-      y: 0,
-      w: 0,
-      h: SLIDE_HEIGHT,
-      line: { color: accent, width: 2 },
-    });
+): void {
+  switch (block.type) {
+    case "heading": {
+      pptxSlide.addText(block.content as string, {
+        x: 0.5,
+        y: 0.4,
+        w: SLIDE_WIDTH - 1,
+        h: 1.2,
+        fontSize: 36,
+        bold: true,
+        color: cleanColor(palette.text),
+        fontFace: "Calibri",
+        align: "left",
+      });
+      break;
+    }
+    case "subheading": {
+      pptxSlide.addText(block.content as string, {
+        x: 0.5,
+        y: 1.7,
+        w: SLIDE_WIDTH - 1,
+        h: 0.8,
+        fontSize: 24,
+        bold: false,
+        color: cleanColor(palette.accent),
+        fontFace: "Calibri",
+        align: "left",
+      });
+      break;
+    }
+    case "bullets": {
+      const items = Array.isArray(block.content)
+        ? (block.content as string[])
+        : [block.content as string];
+      const bulletItems = items.map((text) => ({
+        text,
+        options: { bullet: true, fontSize: 18, color: cleanColor(palette.text) },
+      }));
+      pptxSlide.addText(bulletItems, {
+        x: 0.5,
+        y: 2.0,
+        w: SLIDE_WIDTH - 1,
+        h: SLIDE_HEIGHT - 2.8,
+        fontFace: "Calibri",
+        valign: "top",
+      });
+      break;
+    }
+    case "text": {
+      pptxSlide.addText(block.content as string, {
+        x: 0.5,
+        y: 2.0,
+        w: SLIDE_WIDTH - 1,
+        h: SLIDE_HEIGHT - 2.8,
+        fontSize: 18,
+        color: cleanColor(palette.text),
+        fontFace: "Calibri",
+        align: "left",
+        valign: "top",
+        wrap: true,
+      });
+      break;
+    }
+    case "quote": {
+      pptxSlide.addText(`"${block.content as string}"`, {
+        x: 1.0,
+        y: 2.5,
+        w: SLIDE_WIDTH - 2,
+        h: 3.0,
+        fontSize: 28,
+        italic: true,
+        color: cleanColor(palette.accent),
+        fontFace: "Calibri",
+        align: "center",
+        valign: "middle",
+      });
+      break;
+    }
+    case "image": {
+      // Placeholder box when no actual image binary is available
+      pptxSlide.addShape("rect" as PptxGenJS.SHAPE_NAME, {
+        x: 0.5,
+        y: 2.0,
+        w: SLIDE_WIDTH - 1,
+        h: SLIDE_HEIGHT - 3,
+        fill: { color: cleanColor(palette.secondary) },
+        line: { color: cleanColor(palette.accent), width: 1 },
+      });
+      pptxSlide.addText("[ Image Placeholder ]", {
+        x: 0.5,
+        y: 2.0,
+        w: SLIDE_WIDTH - 1,
+        h: SLIDE_HEIGHT - 3,
+        fontSize: 16,
+        color: cleanColor(palette.text),
+        align: "center",
+        valign: "middle",
+        fontFace: "Calibri",
+      });
+      break;
+    }
+    default:
+      break;
   }
+}
 
-  if (layoutType === "grid") {
-    // Grid background dots
-    for (let i = 0; i < 4; i++) {
-      for (let j = 0; j < 3; j++) {
-        slide.addShape("ellipse", {
-          x: 1 + i * 3,
-          y: 1 + j * 2,
-          w: 0.1,
-          h: 0.1,
-          fill: { color: primary },
-          alpha: 30,
-        });
-      }
+// Build and export the full deck as a PPTX Blob
+export async function exportDeckToPptx(deck: Deck): Promise<Blob> {
+  const pptx = new PptxGenJS();
+
+  // Presentation-level settings
+  pptx.layout = "LAYOUT_WIDE";
+  pptx.author = "PPT Generator";
+  pptx.company = "Open Source";
+  pptx.title = deck.title;
+
+  const palette: ColorPalette = deck.colorPalette;
+
+  for (const slide of deck.slides) {
+    const pptxSlide = pptx.addSlide();
+
+    // Background fill
+    pptxSlide.background = { color: cleanColor(palette.background) };
+
+    // Accent bar at top
+    pptxSlide.addShape("rect" as PptxGenJS.SHAPE_NAME, {
+      x: 0,
+      y: 0,
+      w: SLIDE_WIDTH,
+      h: 0.12,
+      fill: { color: cleanColor(palette.primary) },
+      line: { color: cleanColor(palette.primary), width: 0 },
+    });
+
+    // Render each content block
+    for (const block of slide.content) {
+      renderBlock(pptxSlide, block, palette);
+    }
+
+    // Speaker notes
+    if (slide.notes) {
+      pptxSlide.addNotes(slide.notes);
     }
   }
 
-  if (layoutType === "quote") {
-    // Large quote marks
-    slide.addText("\"", {
-      x: 0.5,
-      y: 2,
-      w: 2,
-      h: 2,
-      fontSize: 120,
-      color: accent,
-      align: "left",
-      valign: "top",
-    });
+  // Write to base64 and convert to Blob
+  const base64 = await pptx.write({ outputType: "base64" }) as string;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
   }
-}
-
-// Main export function
-export function exportToPptx(deck: Deck): PptxGenJS {
-  const pres = new PptxGenJS();
-
-  pres.layout = "LAYOUT_16x9";
-  pres.author = deck.author || "OpenSpark AI";
-  pres.title = deck.title;
-  pres.subject = deck.topic;
-  pres.company = "OpenSpark";
-
-  deck.slides.forEach((slideData: Slide) => {
-    const slide = pres.addSlide();
-    const bg = cleanColor(slideData.colorPalette.background);
-
-    // Set background
-    slide.background = { color: bg };
-
-    // Add layout-specific shapes
-    addLayoutShapes(slide, slideData.layoutType, slideData.colorPalette);
-
-    // Add content blocks
-    addSlideBlocks(
-      slide,
-      slideData.blocks,
-      slideData.colorPalette,
-      slideData.layoutType
-    );
+  return new Blob([bytes], {
+    type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   });
-
-  return pres;
-}
-
-// Alternative: DOM to PPTX (for advanced rendering)
-// This would use dom-to-pptx library for pixel-perfect conversion
-export async function exportHtmlToPptx(
-  htmlElementId: string,
-  filename: string
-): Promise<Blob> {
-  // This is a client-side operation that uses dom-to-pptx
-  // The actual implementation depends on having the library
-  // in the browser bundle
-  if (typeof window === "undefined") {
-    throw new Error("DOM export only works in browser");
-  }
-
-  const element = document.getElementById(htmlElementId);
-  if (!element) {
-    throw new Error(`Element #${htmlElementId} not found`);
-  }
-
-  // dom-to-pptx traverses the DOM, computes styles,
-  // and maps them to native PowerPoint shapes
-  // const blob = await domToPptx(element);
-
-  // For now, return a placeholder
-  const pres = new PptxGenJS();
-  pres.layout = "LAYOUT_16x9";
-  const slide = pres.addSlide();
-  slide.addText("DOM Export Placeholder - See implementation TODO", {
-    x: 0.5,
-    y: 3,
-    w: 12,
-    h: 1,
-    fontSize: 24,
-    align: "center",
-  });
-  return pres.writeFile({ outputType: "blob" });
 }
