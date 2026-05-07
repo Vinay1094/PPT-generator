@@ -11,22 +11,22 @@ export async function POST(req: NextRequest) {
     // Validate the deck
     const deck = DeckSchema.parse(body.deck);
 
-    // Generate PPTX blob
-    const blob = await exportDeckToPptx(deck);
-    const arrayBuffer = await blob.arrayBuffer();
+    // Generate PPTX as Uint8Array
+    const uint8 = await exportDeckToPptx(deck);
 
-    return new NextResponse(arrayBuffer, {
+    // Return as binary response
+    return new NextResponse(uint8, {
       status: 200,
       headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "Content-Disposition": `attachment; filename="${deck.title.replace(/\s+/g, "-")}.pptx"`,
+        "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "Content-Disposition": `attachment; filename="${deck.title.replace(/[^a-z0-9]/gi, '_')}.pptx"`,
+        "Content-Length": uint8.byteLength.toString(),
       },
     });
   } catch (error) {
     console.error("Export error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Export failed" },
+      { error: "Failed to export presentation", details: String(error) },
       { status: 500 }
     );
   }
